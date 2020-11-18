@@ -16,15 +16,15 @@ namespace DataHandlerLib.Encryption
         private EncryptionHandshakeHandler Handshake;
         private string PrivateKey;
         private readonly bool ServerMode;
-        private bool HandshakeInitiated;
-        private bool HandshakeConfirmed;
-        //how it works: create an object, known as the handshake object, this will be a specific request for the server.
-        //in this object there will be a public key of the client, then server then uses this key to encrypt his single private key and send it back.
-        //now the client and the server both have the same key to encrypt and decrypt.
+
+        public bool HandshakeConfirmed { get; private set; }
+        public bool HandshakeInitiated { get; private set; }
 
         public EncryptionHandler(bool server)
         {
             Handshake = new EncryptionHandshakeHandler();
+            HandshakeConfirmed = false;
+            HandshakeInitiated = false;
             ServerMode = server;
             if (ServerMode)
             {
@@ -34,7 +34,7 @@ namespace DataHandlerLib.Encryption
                 PrivateKey = Convert.ToBase64String(p.Key);
             }
         }
-        #region clientHandshakeMethods
+
         public HandshakeRequestModel CreateHandshakeObject() //from the client side.
         {
             if (ServerMode) throw new Exception("Calling clientside encryption method from server");
@@ -46,38 +46,51 @@ namespace DataHandlerLib.Encryption
                 ClientSecret = Handshake.GetClientSecret()
             };
         }
-        public bool ConfirmHandshakeObject(HandshakeResponseModel response) //on the client
+        public bool ConfirmHandshakeObject(HandshakeResponseModel response, out HandshakeResponseModel output) //on the client or te server
         {
-            if (ServerMode) throw new Exception("Calling clientside encryption method from server");
+            string match = "CONFIRMED_HANDSHAKE";
+            output = null;
             //check a couple values, if they are not correct end the function
             if (!HandshakeInitiated)
                 return false;
-            if (response.PublicKey != Handshake.GetPublicKey())
+            if (response.PublicKey == Handshake.GetPublicKey())
                 return false;
-            if (response.ClientSecret != Hashing.Sha256(Handshake.GetClientSecret()))
-                return false;
+            
 
-
-            string data = Handshake.Decrypt(Handshake.GetPrivateKey(), response.Data);
-
-
+            if (ServerMode)
+            {               
+                string message = Handshake.Decrypt(Handshake.GetPrivateKey(), response.Data);
+                if(message == match)             
+                    return HandshakeConfirmed = true;           
+            } 
+            else
+            {
+                if (response.ClientSecret != Hashing.Sha256(Handshake.GetClientSecret()))
+                    return false;
+                PrivateKey = Handshake.Decrypt(Handshake.GetPrivateKey(), response.Data);
+                HandshakeConfirmed = true;
+                output = new HandshakeResponseModel
+                {
+                    ClientSecret = Handshake.GetClientSecret(),
+                    PublicKey = Handshake.GetPublicKey(),
+                    Data = Handshake.Encrypt(response.PublicKey, match)
+                };
+                return true;
+            }
             return false;
         }
-        #endregion
 
-        #region serverHandshakeMethods
         public HandshakeResponseModel CreateHandshakeResponseObject(HandshakeRequestModel request) //on the server
         {
-            if (!ServerMode) throw new Exception("Calling serverside encryption method from client");
+            if (!ServerMode) throw new Exception("Calling serverside encryption method from client.");
             HandshakeInitiated = true;
             return new HandshakeResponseModel
             {
                 ClientSecret = Hashing.Sha256(request.ClientSecret),
-                PublicKey = request.PublicKey,
-
+                PublicKey = Handshake.GetPublicKey(),
+                Data = Handshake.Encrypt(request.PublicKey, PrivateKey)
             };
         }
-        #endregion
 
 
         public bool InHandshakeMode()

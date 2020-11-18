@@ -1,4 +1,5 @@
 ﻿using DataHandlerLib.Encryption;
+using DataHandlerLib.Encryption.Models;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -11,11 +12,20 @@ namespace TestApplication
     {
         static void Main(string[] args)
         {
-            EncryptionHandshakeHandler h = new EncryptionHandshakeHandler();
-            string enc = h.Encrypt(h.GetPublicKey(), "test");
-            string dec = h.Decrypt(h.GetPrivateKey(), enc);
+            EncryptionHandler server = new EncryptionHandler(true);
+            EncryptionHandler client = new EncryptionHandler(false);
 
-            Console.WriteLine(dec);
+            var hObject = client.CreateHandshakeObject(); //client to server
+            var hResponseObject = server.CreateHandshakeResponseObject(hObject); //server to client       
+            bool hSuccess = client.ConfirmHandshakeObject(hResponseObject, out HandshakeResponseModel response); //client to server
+            if (hSuccess)
+            {
+                bool serverConfirm = server.ConfirmHandshakeObject(response, out HandshakeResponseModel final); //server to client
+                if(final == null && serverConfirm)
+                {
+                    Console.WriteLine("Handshake Complete.");
+                }
+            }
         }
     }
 }
