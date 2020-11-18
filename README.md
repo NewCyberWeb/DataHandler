@@ -18,6 +18,11 @@ The server can then respond with its own public key, a Symmetric private key and
 If the client confirms that these values are legitimate, the client will send back one response that it has confirmed, this response is encrypted with the servers public key.\
 Now bot parties know that the encryption handshake was successfull, the symmetric private key can be used to encrypt data.
 On each cycle a new Initializeation Vector (IV) is send with the data,
+
+#### Schema
+I drew the basic scheme for this in paint:
+![logo](/images/EncryptionScheme.png)
+
 #### Example
 Below is an example of how to implement this library to get the handshake working:
 ```csharp
